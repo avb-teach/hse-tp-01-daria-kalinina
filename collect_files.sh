@@ -43,7 +43,7 @@ declare -A file_count
 find_command=("find" "$input_dir" "-type" "f")
 [[ -n "$max_depth" ]] && find_command+=("-maxdepth" "$max_depth")
 
-"${find_command[@]}" -print0 | while IFS= read -r -d '' file; do
+while IFS= read -r -d '' file; do
     base_name=$(basename -- "$file")
     extension="${base_name##*.}"
     name_part="${base_name%.*}"
@@ -56,10 +56,9 @@ find_command=("find" "$input_dir" "-type" "f")
         file_count[$base_name]=1
     fi
 
-    if ! cp --preserve -- "$file" "$output_dir/$new_name"; then
+    if cp --preserve -- "$file" "$output_dir/$new_name"; then
+        copied_files=$((copied_files + 1))
+    else
         echo "Предупреждение: не удалось скопировать $file" >&2
     fi
-done
-
-echo "Успешно скопировано файлов: ${#file_count[@]}"
-
+done < <("${find_command[@]}" -print0)
