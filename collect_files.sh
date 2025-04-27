@@ -1,11 +1,12 @@
-#!/bin/bash
+#!/usr/bin/env bash
 
 error_exit() {
     echo "Ошибка: $1" >&2
     exit 1
 }
 
-if [[ "${BASH_VERSINFO[0]}" -lt 4 ]]; then
+
+if (( BASH_VERSINFO[0] < 4 )); then
     error_exit "Требуется Bash 4.0 или новее. Текущая версия: ${BASH_VERSION}"
 fi
 
@@ -13,50 +14,88 @@ max_depth=""
 input_dir=""
 output_dir=""
 
-while [[ $# -gt 0 ]]; do
+usage() {
+    echo "Использование: $0 [--max_depth N] <входная_директория> <выходная_директория>" >&2
+    exit 1
+}
+
+while (( $# )); do
     case "$1" in
         --max_depth)
-            max_depth="$2"
-            shift 2
+            shift
+            [[ $# -gt 0 ]] || usage
+            max_depth="$1"
+            shift
+            ;;
+        -*)
+            error_exit "Неизвестный параметр: $1"
             ;;
         *)
             if [[ -z "$input_dir" ]]; then
-                input_dir="$1"
+                input_dir="${1%/}"
             elif [[ -z "$output_dir" ]]; then
-                output_dir="$1"
+                output_dir="${1%/}"
             else
-                error_exit "Неизвестный аргумент: $1"
+                usage
             fi
             shift
             ;;
     esac
 done
 
-[[ -z "$input_dir" || -z "$output_dir" ]] && error_exit "Использование: $0 [--max_depth N] <входная_директория> <выходная_директория>"
-
+[[ -z "$input_dir" || -z "$output_dir" ]] && usage
 [[ ! -d "$input_dir" ]] && error_exit "Входная директория не существует: $input_dir"
+
+
+if [[ -n "$max_depth" ]]; then
+    if ! [[ "$max_depth" =~ ^[1-9][0-9]*$ ]]; then
+        error_exit "Неверное значение max_depth: $max_depth"
+    fi
+fi
+
 
 mkdir -p "$output_dir" || error_exit "Не удалось создать выходную директорию: $output_dir"
 
-declare -A file_count
 
-find_command=("find" "$input_dir" "-type" "f")
-[[ -n "$max_depth" ]] && find_command+=("-maxdepth" "$max_depth")
+while IFS= read -r -d '' file; do
+    rel="${file#$input_dir/}"
+    IFS='/' read -r -a parts <<< "$rel"
+    L=${#parts[@]}
 
-"${find_command[@]}" -print0 | while IFS= read -r -d '' file; do
-    base_name=$(basename -- "$file")
-    extension="${base_name##*.}"
-    name_part="${base_name%.*}"
-
-    if [[ -n "${file_count[$base_name]}" ]]; then
-        new_name="${name_part}_${file_count[$base_name]}.${extension}"
-        file_count[$base_name]=$((file_count[$base_name] + 1))
+    if [[ -n "$max_depth" && $L -gt $max_depth ]]; then
+        start=$((L - max_depth))
     else
-        new_name="$base_name"
-        file_count[$base_name]=1
+        start=0
     fi
 
-    if ! cp --preserve -- "$file" "$output_dir/$new_name"; then
-        echo "Предупреждение: не удалось скопировать $file" >&2
+    tail_parts=( "${parts[@]:start}" )
+    fname="${tail_parts[-1]}"
+
+    if (( ${#tail_parts[@]} > 1 )); then
+        subdirs=( "${tail_parts[@]:0:${#tail_parts[@]}-1}" )
+        target_dir="$output_dir/$(printf "%s/" "${subdirs[@]}")"
+    else
+        target_dir="$output_dir"
     fi
-done
+
+    mkdir -p "$target_dir" || {
+        echo "Предупреждение: не удалось создать каталог $target_dir" >&2
+        continue
+    }
+
+    dest="$target_dir/$fname"
+    if [[ -e "$dest" ]]; then
+        base="${fname%.*}"
+        ext="${fname##*.}"
+        count=1
+        while [[ -e "$target_dir/${base}_$count.$ext" ]]; do
+            ((count++))
+        done
+        dest="$target_dir/${base}_$count.$ext"
+    fi
+
+    cp --preserve "$file" "$dest" || {
+        echo "Предупреждение: не удалось скопировать $file" >&2
+    }
+
+done < <(find "$input_dir" -type f -print0)
