@@ -1,10 +1,5 @@
 #!/usr/bin/env bash
 
-error_exit() {
-    echo "Ошибка: $1" >&2
-    exit 1
-}
-
 max_depth=""
 vhod=""
 vihod=""
@@ -23,7 +18,8 @@ while (( $# )); do
             shift
             ;;
         -*)
-            error_exit "Неизвестный параметр: $1"
+            echo "Неизвестный параметр: $1" >&2
+            exit 1
             ;;
         *)
             if [[ -z "$vhod" ]]; then
@@ -39,14 +35,16 @@ while (( $# )); do
 done
 
 [[ -z "$vhod" || -z "$vihod" ]] && usage
-[[ ! -d "$vhod" ]] && error_exit "Входная директория не существует: $vhod"
+[[ ! -d "$vhod" ]] && echo "Входная директория не существует: $vhod" >&2 && exit 1
+
 if [[ -n "$max_depth" ]]; then
     if ! [[ "$max_depth" =~ ^[1-9][0-9]*$ ]]; then
-        error_exit "Неверное значение max_depth: $max_depth"
+        echo "Неверное значение max_depth: $max_depth" >&2
+        exit 1
     fi
 fi
 
-mkdir -p "$vihod" || error_exit "Нельзя создать выходную директорию: $vihod"
+mkdir -p "$vihod"
 
 while IFS= read -r -d '' file; do
     rel="${file#$vhod/}"
@@ -69,10 +67,7 @@ while IFS= read -r -d '' file; do
         help_dir="$vihod"
     fi
 
-    mkdir -p "$help_dir" || {
-        echo "Нельзя создать каталог $help_dir" >&2
-        continue
-    }
+    mkdir -p "$help_dir"
 
     dist="$help_dir/$f"
     if [[ -e "$dist" ]]; then
@@ -85,8 +80,5 @@ while IFS= read -r -d '' file; do
         dist="$help_dir/${osn}_$k.$ext"
     fi
 
-    cp --preserve "$file" "$dist" || {
-        echo "Предупреждение: не удалось скопировать $file" >&2
-    }
-
+    cp --preserve "$file" "$dist"
 done < <(find "$vhod" -type f -print0)
