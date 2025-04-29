@@ -6,8 +6,8 @@ error_exit() {
 }
 
 max_depth=""
-input_dir=""
-output_dir=""
+vhod=""
+vihod=""
 
 usage() {
     echo "Использование: $0 [--max_depth N] <входная_директория> <выходная_директория>" >&2
@@ -26,10 +26,10 @@ while (( $# )); do
             error_exit "Неизвестный параметр: $1"
             ;;
         *)
-            if [[ -z "$input_dir" ]]; then
-                input_dir="${1%/}"
-            elif [[ -z "$output_dir" ]]; then
-                output_dir="${1%/}"
+            if [[ -z "$vhod" ]]; then
+                vhod="${1%/}"
+            elif [[ -z "$vihod" ]]; then
+                vihod="${1%/}"
             else
                 usage
             fi
@@ -38,42 +38,38 @@ while (( $# )); do
     esac
 done
 
-[[ -z "$input_dir" || -z "$output_dir" ]] && usage
-[[ ! -d "$input_dir" ]] && error_exit "Входная директория не существует: $input_dir"
-
-
+[[ -z "$vhod" || -z "$vihod" ]] && usage
+[[ ! -d "$vhod" ]] && error_exit "Входная директория не существует: $vhod"
 if [[ -n "$max_depth" ]]; then
     if ! [[ "$max_depth" =~ ^[1-9][0-9]*$ ]]; then
         error_exit "Неверное значение max_depth: $max_depth"
     fi
 fi
 
-
-mkdir -p "$output_dir" || error_exit "Нельзя создать выходную директорию: $output_dir"
-
+mkdir -p "$vihod" || error_exit "Нельзя создать выходную директорию: $vihod"
 
 while IFS= read -r -d '' file; do
-    rel="${file#$input_dir/}"
+    rel="${file#$vhod/}"
     IFS='/' read -r -a parts <<< "$rel"
     L=${#parts[@]}
 
     if [[ -n "$max_depth" && $L -gt $max_depth ]]; then
-        start=$((L - max_depth))
+        nach=$((L - max_depth))
     else
-        start=0
+        nach=0
     fi
 
-    ost=( "${i[@]:start}" )
+    ost=( "${parts[@]:nach}" )
     f="${ost[-1]}"
 
     if (( ${#ost[@]} > 1 )); then
         x=( "${ost[@]:0:${#ost[@]}-1}" )
-        help_dir="$output_dir/$(printf "%s/" "${x[@]}")"
+        help_dir="$vihod/$(printf "%s/" "${x[@]}")"
     else
-        help_dir="$output_dir"
+        help_dir="$vihod"
     fi
 
-    mkdir -p "$target_dir" || {
+    mkdir -p "$help_dir" || {
         echo "Нельзя создать каталог $help_dir" >&2
         continue
     }
@@ -84,7 +80,7 @@ while IFS= read -r -d '' file; do
         ext="${f##*.}"
         k=1
         while [[ -e "$help_dir/${osn}_$k.$ext" ]]; do
-            ((count++))
+            ((k++))
         done
         dist="$help_dir/${osn}_$k.$ext"
     fi
@@ -93,4 +89,4 @@ while IFS= read -r -d '' file; do
         echo "Предупреждение: не удалось скопировать $file" >&2
     }
 
-done < <(find "$input_dir" -type f -print0)
+done < <(find "$vhod" -type f -print0)
