@@ -5,14 +5,9 @@ error_exit() {
     exit 1
 }
 
-
-if (( BASH_VERSINFO[0] < 4 )); then
-    error_exit "Требуется Bash 4.0 или новее. Текущая версия: ${BASH_VERSION}"
-fi
-
 max_depth=""
-input_dir=""
-output_dir=""
+vhod=""
+vihod=""
 
 usage() {
     echo "Использование: $0 [--max_depth N] <входная_директория> <выходная_директория>" >&2
@@ -31,10 +26,10 @@ while (( $# )); do
             error_exit "Неизвестный параметр: $1"
             ;;
         *)
-            if [[ -z "$input_dir" ]]; then
-                input_dir="${1%/}"
-            elif [[ -z "$output_dir" ]]; then
-                output_dir="${1%/}"
+            if [[ -z "$vhod" ]]; then
+                vhod="${1%/}"
+            elif [[ -z "$vihod" ]]; then
+                vihod="${1%/}"
             else
                 usage
             fi
@@ -43,9 +38,8 @@ while (( $# )); do
     esac
 done
 
-[[ -z "$input_dir" || -z "$output_dir" ]] && usage
-[[ ! -d "$input_dir" ]] && error_exit "Входная директория не существует: $input_dir"
-
+[[ -z "$vhod" || -z "$vihod" ]] && usage
+[[ ! -d "$vhod" ]] && error_exit "Входная директория не существует: $vhod"
 
 if [[ -n "$max_depth" ]]; then
     if ! [[ "$max_depth" =~ ^[1-9][0-9]*$ ]]; then
@@ -53,49 +47,31 @@ if [[ -n "$max_depth" ]]; then
     fi
 fi
 
+mkdir -p "$vihod" || error_exit "Не удалось создать выходную директорию: $vihod"
 
-mkdir -p "$output_dir" || error_exit "Не удалось создать выходную директорию: $output_dir"
-
-
-while IFS= read -r -d '' file; do
-    rel="${file#$input_dir/}"
-    IFS='/' read -r -a parts <<< "$rel"
-    L=${#parts[@]}
-
-    if [[ -n "$max_depth" && $L -gt $max_depth ]]; then
-        start=$((L - max_depth))
-    else
-        start=0
+find "$vhod" -type f -print0 | while IFS = read -r -d '' file; do
+    rez="${file#$vhod/}"
+    if [[ -n "$max_depth" ]]; then
+        rez=$(dirname "$rez" | cut -d '/' -f$((${#rel//\//}+1 - max_depth))-)
     fi
-
-    tail_parts=( "${parts[@]:start}" )
-    fname="${tail_parts[-1]}"
-
-    if (( ${#tail_parts[@]} > 1 )); then
-        subdirs=( "${tail_parts[@]:0:${#tail_parts[@]}-1}" )
-        target_dir="$output_dir/$(printf "%s/" "${subdirs[@]}")"
-    else
-        target_dir="$output_dir"
-    fi
-
-    mkdir -p "$target_dir" || {
-        echo "Предупреждение: не удалось создать каталог $target_dir" >&2
+    helpd="$vihod/$(dirname "$rez")"
+    mkdir -p "$helpd" || {
+        echo "Нельзя создать каталог $helpd" >&2
         continue
     }
+    f=$(basename "$rez")
+    dist="$helpd/$f"
 
-    dest="$target_dir/$fname"
-    if [[ -e "$dest" ]]; then
-        base="${fname%.*}"
-        ext="${fname##*.}"
-        count=1
-        while [[ -e "$target_dir/${base}_$count.$ext" ]]; do
-            ((count++))
+    if [[ -e "$dist" ]]; then
+        osn="${f%.*}"
+        con="${f##*.}"
+        k=1
+        while [[ -e "$helpd/${osn}_$k.$con" ]]; do
+            ((k++))
         done
-        dest="$target_dir/${base}_$count.$ext"
+        dist="$helpd/${osn}_$k.$con"
     fi
-
-    cp --preserve "$file" "$dest" || {
-        echo "Предупреждение: не удалось скопировать $file" >&2
+    cp --preserve "$file" "$dist" || {
+        echo "Нельзя скопировать $file" >&2
     }
-
-done < <(find "$input_dir" -type f -print0)
+done
