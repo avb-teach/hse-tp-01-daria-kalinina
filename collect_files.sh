@@ -9,39 +9,30 @@ usage() {
     exit 1
 }
 
-while (( $# )); do
-    case "$1" in
-        --max_depth)
-            shift
-            [[ $# -gt 0 ]] || usage
-            max_depth="$1"
-            shift
+while getopts ":m:" opt; do
+    case "$opt" in
+        m)
+            max_depth="$OPTARG"
             ;;
-        -*)
-            echo "Неизвестный параметр: $1" >&2
-            exit 1
+        \?)
+            usage
             ;;
-        *)
-            if [[ -z "$vhod" ]]; then
-                vhod="${1%/}"
-            elif [[ -z "$vihod" ]]; then
-                vihod="${1%/}"
-            else
-                usage
-            fi
-            shift
+        :)
+            usage
             ;;
     esac
 done
 
-[[ -z "$vhod" || -z "$vihod" ]] && usage
-[[ ! -d "$vhod" ]] && echo "Входная директория не существует: $vhod" >&2 && exit 1
+shift $((OPTIND - 1))
+vhod="${1%/}"
+vihod="${2%/}"
+[[ -n "$vhod" && -n "$vihod" ]] || usage
 
-if [[ -n "$max_depth" ]]; then
-    if ! [[ "$max_depth" =~ ^[1-9][0-9]*$ ]]; then
-        echo "Неверное значение max_depth: $max_depth" >&2
-        exit 1
-    fi
+[[ -z "$vhod" || -z "$vihod" ]] && usage
+[[ ! -d "$vhod" ]] && { echo "Входная директория не существует: $vhod" >&2; exit 1; }
+if [[ -n "$max_depth" && ! "$max_depth" =~ ^[1-9][0-9]*$ ]]; then
+     echo "Неверное значение max_depth: $max_depth" >&2
+     exit 1
 fi
 
 mkdir -p "$vihod"
